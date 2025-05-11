@@ -1,6 +1,6 @@
+import React from 'react'
+import {cn, getTechLogos} from "@/lib/utils";
 import Image from "next/image";
-
-import { cn, getTechLogos } from "@/lib/utils";
 
 const DisplayTechIcons = async ({ techStack }: TechIconProps) => {
     const techIcons = await getTechLogos(techStack);
@@ -11,12 +11,11 @@ const DisplayTechIcons = async ({ techStack }: TechIconProps) => {
                 <div
                     key={tech}
                     className={cn(
-                        "relative group bg-dark-300 rounded-full p-2 flex flex-center",
+                        "relative group bg-dark-300 rounded-full p-2 flex-center",
                         index >= 1 && "-ml-3"
                     )}
                 >
                     <span className="tech-tooltip">{tech}</span>
-
                     <Image
                         src={url}
                         alt={tech}
