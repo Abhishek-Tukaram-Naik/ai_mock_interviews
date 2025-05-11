@@ -7,7 +7,6 @@ import { redirect } from "next/navigation";
 // Session duration (1 week)
 const SESSION_DURATION = 60 * 60 * 24 * 7;
 
-// Set session cookie
 async function setSessionCookie(idToken: string) {
     const cookieStore = await cookies();
     const sessionCookie = await auth.createSessionCookie(idToken, {
@@ -25,6 +24,21 @@ async function setSessionCookie(idToken: string) {
 
 export async function signUp(params: { email: string; password: string; name: string }) {
     try {
+        // First check if email exists
+        try {
+            await auth.getUserByEmail(params.email);
+            // If no error, email exists
+            return {
+                success: false,
+                message: "The email address is already in use",
+            };
+        } catch (error: any) {
+            // Email doesn't exist, continue with registration
+            if (error.code !== 'auth/user-not-found') {
+                throw error;
+            }
+        }
+
         // Create user in Firebase Auth
         const userRecord = await auth.createUser({
             email: params.email,
@@ -53,6 +67,7 @@ export async function signUp(params: { email: string; password: string; name: st
     }
 }
 
+// ... rest of your existing code ...
 export async function signIn(params: { idToken: string }) {
     try {
         // Verify the ID token first
@@ -100,4 +115,33 @@ export async function getCurrentUser(): Promise<User | null >{
 export async function isAuthenticated() {
     const user=await getCurrentUser();
     return !!user;
+}
+
+export async function getInterviewsByUserId(userId: string): Promise<Interview[]| null> {
+    const interviews = await db
+        .collection('interviews')
+        .where('userId','==', userId)
+        .orderBy('createdAt','desc')
+        .get();
+
+    return interviews.docs.map((doc) =>({
+        id: doc.id,
+        ...doc.data()
+    }))as Interview[];
+}
+export async function getLatestInterviews(params: GetLatestInterviewsParams): Promise<Interview[]| null> {
+    const{userId,limit= 20}=params;
+
+    const interviews = await db
+        .collection('interviews')
+        .orderBy('createdAt','desc')
+        .where('finalized','==', true)
+        .where('userId','!=', userId)
+        .limit(limit)
+        .get();
+
+    return interviews.docs.map((doc) =>({
+        id: doc.id,
+        ...doc.data()
+    }))as Interview[];
 }
