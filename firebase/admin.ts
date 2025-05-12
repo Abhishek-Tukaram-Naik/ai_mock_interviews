@@ -1,48 +1,26 @@
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
-import { getAuth, Auth } from "firebase-admin/auth";
-import { getFirestore, Firestore } from "firebase-admin/firestore";
-
-// Type for Firebase Admin services
-interface FirebaseAdmin {
-    auth: Auth;
-    db: Firestore;
-}
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin SDK
-function initializeFirebaseAdmin(): FirebaseAdmin {
-    // Verify required environment variables
-    if (!process.env.FIREBASE_PROJECT_ID ||
-        !process.env.FIREBASE_CLIENT_EMAIL ||
-        !process.env.FIREBASE_PRIVATE_KEY) {
-        throw new Error(
-            "Missing Firebase Admin environment variables. " +
-            "Check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY"
-        );
-    }
+function initFirebaseAdmin() {
+    const apps = getApps();
 
-    // Reuse existing app if already initialized
-    if (getApps().length > 0) {
-        const app = getApps()[0];
-        return {
-            auth: getAuth(app),
-            db: getFirestore(app),
-        };
+    if (!apps.length) {
+        initializeApp({
+            credential: cert({
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                // Replace newlines in the private key
+                privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+            }),
+        });
     }
-
-    // Initialize new app
-    const app = initializeApp({
-        credential: cert({
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-        }),
-    });
 
     return {
-        auth: getAuth(app),
-        db: getFirestore(app),
+        auth: getAuth(),
+        db: getFirestore(),
     };
 }
 
-// Export initialized services
-export const { auth, db } = initializeFirebaseAdmin();
+export const { auth, db } = initFirebaseAdmin();

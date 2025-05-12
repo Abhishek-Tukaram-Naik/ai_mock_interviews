@@ -2,17 +2,20 @@
 
 import { auth, db } from "@/firebase/admin";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
 // Session duration (1 week)
 const SESSION_DURATION = 60 * 60 * 24 * 7;
 
-async function setSessionCookie(idToken: string) {
+// Set session cookie
+export async function setSessionCookie(idToken: string) {
     const cookieStore = await cookies();
+
+    // Create session cookie
     const sessionCookie = await auth.createSessionCookie(idToken, {
-        expiresIn: SESSION_DURATION * 1000,
+        expiresIn: SESSION_DURATION * 1000, // milliseconds
     });
 
+    // Set cookie in the browser
     cookieStore.set("session", sessionCookie, {
         maxAge: SESSION_DURATION,
         httpOnly: true,
@@ -22,97 +25,108 @@ async function setSessionCookie(idToken: string) {
     });
 }
 
-export async function signUp(params: { email: string; password: string; name: string }) {
+export async function signUp(params: SignUpParams) {
+    const { uid, name, email } = params;
+
     try {
-        // First check if email exists
-        try {
-            await auth.getUserByEmail(params.email);
-            // If no error, email exists
+        // check if user exists in db
+        const userRecord = await db.collection("users").doc(uid).get();
+        if (userRecord.exists)
             return {
                 success: false,
-                message: "The email address is already in use",
+                message: "User already exists. Please sign in.",
             };
-        } catch (error: any) {
-            // Email doesn't exist, continue with registration
-            if (error.code !== 'auth/user-not-found') {
-                throw error;
-            }
+
+        // save user to db
+        await db.collection("users").doc(uid).set({
+            name,
+            email,
+            // profileURL,
+            // resumeURL,
+        });
+
+        return {
+            success: true,
+            message: "Account created successfully. Please sign in.",
+        };
+    } catch (error: any) {
+        console.error("Error creating user:", error);
+
+        // Handle Firebase specific errors
+        if (error.code === "auth/email-already-exists") {
+            return {
+                success: false,
+                message: "This email is already in use",
+            };
         }
 
-        // Create user in Firebase Auth
-        const userRecord = await auth.createUser({
-            email: params.email,
-            password: params.password,
-            displayName: params.name,
-        });
-
-        // Save additional user data to Firestore
-        await db.collection("users").doc(userRecord.uid).set({
-            name: params.name,
-            email: params.email,
-            createdAt: new Date().toISOString(),
-        });
-
-        // Get ID token for the new user
-        const idToken = await auth.createCustomToken(userRecord.uid);
-        await setSessionCookie(idToken);
-
-        return { success: true, message: "Account created successfully!" };
-    } catch (error: any) {
-        console.error("Sign up error:", error);
         return {
             success: false,
-            message: error.message || "Failed to create account",
+            message: "Failed to create account. Please try again.",
         };
     }
 }
 
-// ... rest of your existing code ...
-export async function signIn(params: { idToken: string }) {
+export async function signIn(params: SignInParams) {
+    const { email, idToken } = params;
+
     try {
-        // Verify the ID token first
-        const decodedToken = await auth.verifyIdToken(params.idToken);
+        const userRecord = await auth.getUserByEmail(email);
+        if (!userRecord)
+            return {
+                success: false,
+                message: "User does not exist. Create an account.",
+            };
 
-        // Then create session cookie
-        await setSessionCookie(params.idToken);
-
-        return { success: true, message: "Signed in successfully!" };
+        await setSessionCookie(idToken);
     } catch (error: any) {
-        console.error("Sign in error:", error);
+        console.log("");
+
         return {
             success: false,
-            message: error.message || "Failed to sign in",
+            message: "Failed to log into account. Please try again.",
         };
     }
 }
 
+// Sign out user by clearing the session cookie
 export async function signOut() {
-    (await cookies()).delete("session");
-    redirect("/login");
+    const cookieStore = await cookies();
+
+    cookieStore.delete("session");
 }
 
-export async function getCurrentUser(): Promise<User | null >{
+// Get current user from session cookie
+export async function getCurrentUser(): Promise<User | null> {
     const cookieStore = await cookies();
-    const sessionCookie =cookieStore.get("session")?.value;
+
+    const sessionCookie = cookieStore.get("session")?.value;
     if (!sessionCookie) return null;
 
     try {
         const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
-        const userRecord = await db.collection("users").doc(decodedClaims.uid).get();
 
+        // get user info from db
+        const userRecord = await db
+            .collection("users")
+            .doc(decodedClaims.uid)
+            .get();
         if (!userRecord.exists) return null;
 
         return {
-            id: userRecord.id,
             ...userRecord.data(),
-        }as User;
+            id: userRecord.id,
+        } as User;
     } catch (error) {
-        console.error("User verification error:", error);
+        console.log(error);
+
+        // Invalid or expired session
         return null;
     }
 }
 
+// Check if user is authenticated
 export async function isAuthenticated() {
-    const user=await getCurrentUser();
+    const user = await getCurrentUser();
     return !!user;
 }

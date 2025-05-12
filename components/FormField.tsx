@@ -1,53 +1,48 @@
-import React from 'react'
-import { Controller, FieldValues, UseControllerProps } from 'react-hook-form'
+import { Controller, Control, FieldValues, Path } from "react-hook-form";
+
 import {
-    FormControl,
-    FormDescription,
     FormItem,
     FormLabel,
+    FormControl,
     FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
-interface FormFieldProps<T extends FieldValues> extends UseControllerProps<T> {
-    label: string
-    placeholder?: string
-    type?: string
-    description?: string
+interface FormFieldProps<T extends FieldValues> {
+    control: Control<T>;
+    name: Path<T>;
+    label: string;
+    placeholder?: string;
+    type?: "text" | "email" | "password";
 }
 
 const FormField = <T extends FieldValues>({
                                               control,
                                               name,
                                               label,
-                                              placeholder = '',
-                                              type = 'text',
-                                              description,
-                                              ...props
+                                              placeholder,
+                                              type = "text",
                                           }: FormFieldProps<T>) => {
     return (
         <Controller
-            name={name}
             control={control}
-            render={({ field, fieldState: { error } }) => (
+            name={name}
+            render={({ field }) => (
                 <FormItem>
-                    <FormLabel>{label}</FormLabel>
+                    <FormLabel className="label">{label}</FormLabel>
                     <FormControl>
                         <Input
-                            placeholder={placeholder}
+                            className="input"
                             type={type}
+                            placeholder={placeholder}
                             {...field}
-                            {...props}
                         />
                     </FormControl>
-                    {description && (
-                        <FormDescription>{description}</FormDescription>
-                    )}
-                    <FormMessage>{error?.message}</FormMessage>
+                    <FormMessage />
                 </FormItem>
             )}
         />
-    )
-}
+    );
+};
 
-export default FormField
+export default FormField;
